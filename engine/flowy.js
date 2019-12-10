@@ -6,7 +6,9 @@ var flowy = function(canvas, grab, release, snapping, spacing_x, spacing_y) {
         release = function() {};
     }
     if (!snapping) {
-        snapping = function() {};
+        snapping = function() {
+            return true;
+        };
     }
     if (!spacing_x) {
         spacing_x = 20;
@@ -26,24 +28,36 @@ var flowy = function(canvas, grab, release, snapping, spacing_x, spacing_y) {
         var rearrange = false;
         var lastevent = false;
         var drag, dragx, dragy, original;
+        var mouse_x, mouse_y;
         canvas_div.append("<div class='indicator invisible'></div>");
+        flowy.import = function(output) {
+            canvas_div.html(JSON.parse(output.html));
+            blocks = output.blockarr;
+        }
         flowy.output = function() {
-            var json_data = [];
+            var html_ser = JSON.stringify(canvas_div.html());
+            var json_data = {html:html_ser, blockarr:blocks, blocks:[]};
             if (blocks.length > 0) {
                 for (var i = 0; i < blocks.length; i++) {
-                    json_data.push({
+                    json_data.blocks.push({
                         id: blocks[i].id,
                         parent: blocks[i].parent,
-                        data: []
+                        data: [],
+                        attr: []
                     });
-                    $(".blockid[value=" + blocks[i].id + "]").parent().children("input").each(function() {
+                    $(".blockid[value=" + blocks[i].id + "]").parent().find("input").each(function() {
                         var json_name = $(this).attr("name");
                         var json_value = $(this).val();
-                        json_data[i].data.push({
+                        json_data.blocks[i].data.push({
                             name: json_name,
                             value: json_value
                         });
-                    })
+                    });
+                    $.each( $(".blockid[value=" + blocks[i].id + "]").parent()[0].attributes, function ( index, attribute ) {
+                        var jsonobj = {};
+                        jsonobj[attribute.name] = attribute.value;
+                        json_data.blocks[i].attr.push(jsonobj);
+                    });
                 }
                 return json_data;
             }
@@ -52,8 +66,15 @@ var flowy = function(canvas, grab, release, snapping, spacing_x, spacing_y) {
             blocks = [];
             canvas_div.html("<div class='indicator invisible'></div>");
         }
-        $(document).on("mousedown", ".create-flowy", function(event) {
-            if (event.which === 1) {
+        $(document).on("mousedown touchstart", ".create-flowy", function(event) {
+            if (event.targetTouches) {
+                mouse_x = event.changedTouches[0].clientX;
+                mouse_y = event.changedTouches[0].clientY;
+            } else {
+                mouse_x = event.clientX;
+                mouse_y = event.clientY;
+            }
+            if (event.which != 3) {
                 original = $(this);
                 if (blocks.length == 0) {
                     $(this).clone().addClass('block').append("<input type='hidden' name='blockid' class='blockid' value='" + blocks.length + "'>").removeClass("create-flowy").appendTo("body");
@@ -67,14 +88,14 @@ var flowy = function(canvas, grab, release, snapping, spacing_x, spacing_y) {
                 blockGrabbed($(this));
                 drag.addClass("dragging");
                 active = true;
-                dragx = event.clientX - $(this).offset().left;
-                dragy = event.clientY - $(this).offset().top;
-                drag.css("left", event.clientX - dragx + "px");
-                drag.css("top", event.clientY - dragy + "px");
+                dragx = mouse_x - $(this).offset().left;
+                dragy = mouse_y - $(this).offset().top;
+                drag.css("left", mouse_x - dragx + "px");
+                drag.css("top", mouse_y - dragy + "px");
             }
         });
-        $(document).on("mouseup", function(event) {
-            if (event.which === 1 && (active || rearrange)) {
+        $(document).on("mouseup touchend", function(event) {
+            if (event.which != 3 && (active || rearrange)) {
                 blockReleased();
                 if (!$(".indicator").hasClass("invisible")) {
                     $(".indicator").addClass("invisible");
@@ -94,8 +115,10 @@ var flowy = function(canvas, grab, release, snapping, spacing_x, spacing_y) {
                             $(".arrowid[value=" + blockstemp[w].id + "]").parent().css("top", $(".arrowid[value=" + blockstemp[w].id + "]").parent().offset().top - canvas_div.offset().top + canvas_div.scrollTop() + "px");
                             $(".blockid[value=" + blockstemp[w].id + "]").parent().appendTo(canvas_div);
                             $(".arrowid[value=" + blockstemp[w].id + "]").parent().appendTo(canvas_div);
+
                             blockstemp[w].x = $(".blockid[value=" + blockstemp[w].id + "]").parent().offset().left + ($(".blockid[value=" + blockstemp[w].id + "]").innerWidth() / 2) + canvas_div.scrollLeft();
                             blockstemp[w].y = $(".blockid[value=" + blockstemp[w].id + "]").parent().offset().top + ($(".blockid[value=" + blockstemp[w].id + "]").parent().innerHeight() / 2) + canvas_div.scrollTop();
+
                         }
                     }
                     blockstemp.filter(a => a.id == 0)[0].x = drag.offset().left + (drag.innerWidth() / 2);
@@ -103,7 +126,7 @@ var flowy = function(canvas, grab, release, snapping, spacing_x, spacing_y) {
                     blocks = $.merge(blocks, blockstemp);
                     blockstemp = [];
                 } else if (active && blocks.length == 0 && drag.offset().top > canvas_div.offset().top && drag.offset().left > canvas_div.offset().left) {
-                    blockSnap(drag);
+                    blockSnap(drag, true, undefined);
                     active = false;
                     drag.css("top", drag.offset().top - canvas_div.offset().top + canvas_div.scrollTop() + "px");
                     drag.css("left", drag.offset().left - canvas_div.offset().left + canvas_div.scrollLeft() + "px");
@@ -125,9 +148,27 @@ var flowy = function(canvas, grab, release, snapping, spacing_x, spacing_y) {
                     var blocko = blocks.map(a => a.id);
                     for (var i = 0; i < blocks.length; i++) {
                         if (xpos >= blocks.filter(a => a.id == blocko[i])[0].x - (blocks.filter(a => a.id == blocko[i])[0].width / 2) - paddingx && xpos <= blocks.filter(a => a.id == blocko[i])[0].x + (blocks.filter(a => a.id == blocko[i])[0].width / 2) + paddingx && ypos >= blocks.filter(a => a.id == blocko[i])[0].y - (blocks.filter(a => a.id == blocko[i])[0].height / 2) && ypos <= blocks.filter(a => a.id == blocko[i])[0].y + blocks.filter(a => a.id == blocko[i])[0].height) {
+                                            active = false;
+                            if (!rearrange && blockSnap(drag, false, blocks.filter(id => id.id == blocko[i])[0])) {
+                                snap(drag,i, blocko);
+                            } else if (rearrange) {
+                                snap(drag,i,blocko);
+                            }
+                            break;
+                        } else if (i == blocks.length - 1) {
+                            if (rearrange) {
+                                rearrange = false;
+                                blockstemp = [];
+                            }
                             active = false;
+                            drag.remove();
+                        }
+                    }
+                }
+            }
+        });
+        function snap(drag, i, blocko) {
                             if (!rearrange) {
-                                blockSnap(drag);
                                 drag.appendTo(canvas_div);
                             }
                             var totalwidth = 0;
@@ -168,6 +209,7 @@ var flowy = function(canvas, grab, release, snapping, spacing_x, spacing_y) {
                                         $(".arrowid[value=" + blockstemp[w].id + "]").parent().css("top", $(".arrowid[value=" + blockstemp[w].id + "]").parent().offset().top - canvas_div.offset().top + canvas_div.scrollTop());
                                         $(".blockid[value=" + blockstemp[w].id + "]").parent().appendTo(canvas_div);
                                         $(".arrowid[value=" + blockstemp[w].id + "]").parent().appendTo(canvas_div);
+
                                         blockstemp[w].x = $(".blockid[value=" + blockstemp[w].id + "]").parent().offset().left + ($(".blockid[value=" + blockstemp[w].id + "]").innerWidth() / 2) + canvas_div.scrollLeft();
                                         blockstemp[w].y = $(".blockid[value=" + blockstemp[w].id + "]").parent().offset().top + ($(".blockid[value=" + blockstemp[w].id + "]").parent().innerHeight() / 2) + canvas_div.scrollTop();
 
@@ -233,29 +275,24 @@ var flowy = function(canvas, grab, release, snapping, spacing_x, spacing_y) {
                             }
                             rearrangeMe();
                             checkOffset();
-                            break;
-                        } else if (i == blocks.length - 1) {
-                            if (rearrange) {
-                                rearrange = false;
-                                blockstemp = [];
-                            }
-                            active = false;
-                            drag.remove();
-                        }
-                    }
-                }
+        }
+        $(document).on("mousedown touchstart", ".block", function(event) {
+            $(document).on("mouseup mousemove touchmove", ".block", function handler(event) {
+                if (event.targetTouches) {
+                mouse_x = event.targetTouches[0].clientX;
+                mouse_y = event.targetTouches[0].clientY;
+            } else {
+                mouse_x = event.clientX;
+                mouse_y = event.clientY;
             }
-        });
-        $(document).on("mousedown", ".block", function(event) {
-            $(document).on("mouseup mousemove", ".block", function handler(event) {
                 if (event.type !== "mouseup") {
-                    if (event.which === 1) {
+                    if (event.which != 3) {
                         if (!active && !rearrange) {
                             rearrange = true;
                             drag = $(this);
                             drag.addClass("dragging");
-                            dragx = event.clientX - $(this).offset().left;
-                            dragy = event.clientY - $(this).offset().top;
+                            dragx = mouse_x - $(this).offset().left;
+                            dragy = mouse_y - $(this).offset().top;
                             var blockid = parseInt($(this).children(".blockid").val());
                             drag = $(this);
                             blockstemp.push(blocks.filter(a => a.id == blockid)[0]);
@@ -307,16 +344,23 @@ var flowy = function(canvas, grab, release, snapping, spacing_x, spacing_y) {
                         }
                     }
                 }
-                $(document).off("mouseup mousemove", handler);
+                $(document).off("mouseup mousemove touchmove", handler);
             });
         });
-        $(document).on("mousemove", function(event) {
+        $(document).on("mousemove touchmove", function(event) {
+            if (event.targetTouches) {
+                mouse_x = event.targetTouches[0].clientX;
+                mouse_y = event.targetTouches[0].clientY;
+            } else {
+                mouse_x = event.clientX;
+                mouse_y = event.clientY;
+            }
             if (active) {
-                drag.css("left", event.clientX - dragx + "px");
-                drag.css("top", event.clientY - dragy + "px");
+                drag.css("left", mouse_x - dragx + "px");
+                drag.css("top", mouse_y - dragy + "px");
             } else if (rearrange) {
-                drag.css("left", event.clientX - dragx - canvas_div.offset().left + canvas_div.scrollLeft() + "px");
-                drag.css("top", event.clientY - dragy - canvas_div.offset().top + canvas_div.scrollTop() + "px");
+                drag.css("left", mouse_x - dragx - canvas_div.offset().left + canvas_div.scrollLeft() + "px");
+                drag.css("top", mouse_y - dragy - canvas_div.offset().top + canvas_div.scrollTop() + "px");
                 blockstemp.filter(a => a.id == parseInt(drag.children(".blockid").val())).x = drag.offset().left + (drag.innerWidth() / 2) + canvas_div.scrollLeft();
                 blockstemp.filter(a => a.id == parseInt(drag.children(".blockid").val())).y = drag.offset().left + (drag.innerHeight() / 2) + canvas_div.scrollTop();
             }
@@ -386,6 +430,9 @@ var flowy = function(canvas, grab, release, snapping, spacing_x, spacing_y) {
                             $('.arrowid[value=' + blocko[w] + ']').parent().css("left", blocks.filter(id => id.id == blocks.filter(a => a.id == blocko[w])[0].parent)[0].x - 20 - canvas_div.offset().left + "px");
                         }
                     }
+                }
+                for (var w = 0; w < blocks.length; w++) {
+                    //blocks[w].x = blocks[w].x+offsetleftold-20;
                 }
                 offsetleftold = 0;
             }
@@ -459,7 +506,7 @@ var flowy = function(canvas, grab, release, snapping, spacing_x, spacing_y) {
         release();
     }
 
-    function blockSnap(drag) {
-        snapping(drag);
+    function blockSnap(drag, first, parent) {
+        return snapping(drag, first, parent);
     }
 }
