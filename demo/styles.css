@@ -6,6 +6,7 @@ body, html {
     background-repeat: repeat;
     background-size: 30px 30px;
     background-color: #FBFBFB;
+    height: 100%;
 }
 #navigation {
     height: 71px;
@@ -243,7 +244,7 @@ body, html {
     padding-left: 20px;
     line-height: 40px;
     bottom: 0;
-    width: 362;
+    width: 362px;
     border: 1px solid #E8E8EF;
     height: 67px;
     box-sizing: border-box;
@@ -399,10 +400,10 @@ body, html {
     height: 100%;
     width: 311px;
     background-color: #FFF;
-    right: -150;
+    right: -150px;
     opacity: 0;
     z-index: 2;
-    top: 0;
+    top: 0px;
     box-shadow: -4px 0px 40px rgba(26, 26, 73, 0);
     padding-left: 20px;
     transition: all .25s cubic-bezier(.05,.03,.35,1);
@@ -528,13 +529,13 @@ body, html {
     width: 100%;
     background-color: #E8E8EF;
     position: absolute;
-    right: 0;
+    right: 0px;
     bottom: 80;
 }
 #removeblock {
     border-radius: 5px;
     position: absolute;
-    bottom: 20;
+    bottom: 20px;
     font-family: Roboto;
     font-size: 14px;
     text-align: center;
@@ -543,7 +544,7 @@ body, html {
     line-height: 38px;
     color: #253134;
     border: 1px solid #E8E8EF;
-transition: all .3s cubic-bezier(.05,.03,.35,1);
+    transition: all .3s cubic-bezier(.05,.03,.35,1);
 }
 #removeblock:hover {
     cursor: pointer;
@@ -618,7 +619,6 @@ transition: all .3s cubic-bezier(.05,.03,.35,1);
     text-indent: 0px;
 }
 .block {
-    padding-top: 5px;
     background-color: #FFF;
     margin-top: 0px!important;
     box-shadow: 0px 4px 30px rgba(22, 33, 74, 0.05);
